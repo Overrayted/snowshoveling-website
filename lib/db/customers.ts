@@ -1,6 +1,6 @@
 import "server-only";
-import { createAdminClient } from "@/lib/supabase/admin";
-import type { Customer } from "@/lib/supabase/database.types";
+import { getAdminClient, isNotFound, isValidationError } from "@/lib/pocketbase/client";
+import type { CustomerRecord } from "@/lib/pocketbase/types";
 
 // Normalizes North American phone input ("(416) 555-1234", "416.555.1234",
 // "1 416 555 1234") to E.164 (+14165551234). Returns null if it isn't valid.
@@ -11,14 +11,16 @@ export function normalizePhone(input: string): string | null {
   return null;
 }
 
-export async function getCustomerByPhone(phone: string): Promise<Customer | null> {
-  const { data, error } = await createAdminClient()
-    .from("customers")
-    .select()
-    .eq("phone_number", phone)
-    .maybeSingle();
-  if (error) throw error;
-  return data;
+export async function getCustomerByPhone(phone: string): Promise<CustomerRecord | null> {
+  const pb = await getAdminClient();
+  try {
+    return await pb
+      .collection("customers")
+      .getFirstListItem(pb.filter("phone_number = {:phone}", { phone }));
+  } catch (error) {
+    if (isNotFound(error)) return null;
+    throw error;
+  }
 }
 
 // Phone number is the customer's identity (no passwords). A returning
@@ -31,37 +33,31 @@ export async function findOrCreateCustomer(input: {
   phoneNumber: string;
   address: string;
   smsOptIn: boolean;
-}): Promise<Customer> {
+}): Promise<CustomerRecord> {
+  const pb = await getAdminClient();
   const existing = await getCustomerByPhone(input.phoneNumber);
   if (existing) {
     if (!input.smsOptIn || existing.sms_opt_in) return existing;
-    const { data, error } = await createAdminClient()
-      .from("customers")
-      .update({ sms_opt_in: true, sms_opt_in_at: new Date().toISOString() })
-      .eq("id", existing.id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+    return pb.collection("customers").update(existing.id, {
+      sms_opt_in: true,
+      sms_opt_in_at: new Date().toISOString(),
+    });
   }
 
-  const { data, error } = await createAdminClient()
-    .from("customers")
-    .insert({
+  try {
+    return await pb.collection("customers").create({
       full_name: input.fullName.trim(),
       phone_number: input.phoneNumber,
       address: input.address.trim(),
       sms_opt_in: input.smsOptIn,
-      sms_opt_in_at: input.smsOptIn ? new Date().toISOString() : null,
-    })
-    .select()
-    .single();
-
-  // Lost a race with a concurrent signup for the same phone number
-  if (error?.code === "23505") {
-    const winner = await getCustomerByPhone(input.phoneNumber);
-    if (winner) return winner;
+      sms_opt_in_at: input.smsOptIn ? new Date().toISOString() : "",
+    });
+  } catch (error) {
+    // Lost a race with a concurrent signup for the same phone number
+    if (isValidationError(error)) {
+      const winner = await getCustomerByPhone(input.phoneNumber);
+      if (winner) return winner;
+    }
+    throw error;
   }
-  if (error) throw error;
-  return data;
 }

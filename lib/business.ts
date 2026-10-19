@@ -1,4 +1,4 @@
-import type { DrivewaySize, PlanType } from "@/lib/supabase/database.types";
+import type { DrivewaySize, PlanType } from "@/lib/pocketbase/types";
 
 export const BUSINESS_PHONE = {
   e164: "+16476437864",

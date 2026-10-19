@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kaiyns",
+  "main": "custom-worker.ts",
+  "compatibility_date": "2026-09-25",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      // Self-reference required by OpenNext; must match "name" above
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "kaiyns"
+    }
+  ],
+  "triggers": {
+    // Daily storm check at 21:00 UTC (5pm Toronto in summer, 4pm in winter)
+    "crons": ["0 21 * * *"]
+  },
+  "observability": {
+    "enabled": true
+  }
+}

@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Cloudflare build output
+    ".open-next/**",
+    ".wrangler/**",
+    // PocketBase migrations run inside PocketBase, not Node
+    "pocketbase/**",
   ]),
 ]);
 

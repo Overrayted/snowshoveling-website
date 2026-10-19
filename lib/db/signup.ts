@@ -1,5 +1,5 @@
 import "server-only";
-import type { DrivewaySize, PlanType } from "@/lib/supabase/database.types";
+import type { DrivewaySize, PlanType } from "@/lib/pocketbase/types";
 import { findOrCreateCustomer } from "./customers";
 import { createProperty, findProperty } from "./properties";
 import { changePlan } from "./subscriptions";

@@ -3,7 +3,14 @@ import { Suspense } from "react";
 import { formatPrice, getPlan } from "@/lib/business";
 import { requireStaff } from "@/lib/auth";
 import { addDays, formatServiceDate, localDate } from "@/lib/dates";
-import type { VisitStatus } from "@/lib/supabase/database.types";
+import type {
+  CustomerRecord,
+  PropertyRecord,
+  SubscriptionRecord,
+  VisitRecord,
+  VisitStatus,
+  WithExpand,
+} from "@/lib/pocketbase/types";
 import { setVisitStatus, signOut, startManualStormDay } from "./actions";
 
 export default function StaffPage(props: PageProps<"/staff">) {
@@ -15,17 +22,14 @@ export default function StaffPage(props: PageProps<"/staff">) {
 }
 
 async function Dashboard({ searchParams }: Pick<PageProps<"/staff">, "searchParams">) {
-  const { staff, supabase } = await requireStaff();
+  const { staff, pb } = await requireStaff();
   const params = await searchParams;
   const today = localDate();
 
-  const { data: storms, error } = await supabase
-    .from("storms")
-    .select()
-    .gte("service_date", addDays(today, -14))
-    .order("service_date", { ascending: false })
-    .limit(10);
-  if (error) throw error;
+  const { items: storms } = await pb.collection("storms").getList(1, 10, {
+    filter: pb.filter("service_date >= {:from}", { from: addDays(today, -14) }),
+    sort: "-service_date",
+  });
 
   // Default to the next upcoming storm day, else the most recent one
   const selected =
@@ -87,18 +91,16 @@ async function VisitList({
 }: {
   stormId: string;
   serviceDate: string;
-  snowMm: number | null;
+  snowMm: number;
 }) {
-  const { supabase } = await requireStaff();
-  const { data: visits, error } = await supabase
-    .from("visits")
-    .select(
-      "id, status, price, properties!inner(street_address, driveway_size_category, estimated_square_feet, customers!inner(full_name, phone_number)), subscriptions(plan_type)",
-    )
-    .eq("storm_id", stormId);
-  if (error) throw error;
+  const { pb } = await requireStaff();
+  const visits = await pb.collection("visits").getFullList<VisitRow>({
+    filter: pb.filter("storm = {:storm}", { storm: stormId }),
+    expand: "property.customer,subscription",
+  });
 
-  visits.sort((a, b) => a.properties.street_address.localeCompare(b.properties.street_address));
+  const street = (v: VisitRow) => v.expand?.property?.street_address ?? "";
+  visits.sort((a, b) => street(a).localeCompare(street(b)));
   const byStatus = (status: VisitStatus) => visits.filter((v) => v.status === status);
   const toDo = byStatus("booked");
   const done = byStatus("done");
@@ -115,32 +117,33 @@ async function VisitList({
         <strong>{toDo.length}</strong> to shovel, <strong>{done.length}</strong> done.
       </p>
 
-      <VisitGroup title="To shovel" visits={toDo} actions={["done", "skipped"]} />
-      <VisitGroup title="Done" visits={done} actions={["booked"]} />
+      <VisitGroup
+        title="To shovel"
+        visits={toDo}
+        actions={[
+          ["done", "Mark done"],
+          ["skipped", "Skip"],
+        ]}
+      />
+      <VisitGroup title="Done" visits={done} actions={[["booked", "Undo"]]} />
       <VisitGroup
         title="Texted, no reply yet"
         note="One-time customers we offered a visit to. Call them if you have time, then press Book."
         visits={waiting}
-        actions={["booked"]}
+        actions={[["booked", "Book"]]}
       />
-      <VisitGroup title="Skipped" visits={skipped} actions={["booked"]} />
+      <VisitGroup title="Skipped" visits={skipped} actions={[["booked", "Undo"]]} />
     </section>
   );
 }
 
-type VisitRow = {
-  id: string;
-  price: number | null;
-  properties: {
-    street_address: string;
-    driveway_size_category: string | null;
-    estimated_square_feet: number | null;
-    customers: { full_name: string; phone_number: string };
-  };
-  subscriptions: { plan_type: "one_time" | "monthly" | "full_season" } | null;
-};
-
-const ACTION_LABEL = { done: "Mark done", skipped: "Skip", booked: "Book" } as const;
+type VisitRow = WithExpand<
+  VisitRecord,
+  {
+    property: WithExpand<PropertyRecord, { customer: CustomerRecord }>;
+    subscription: SubscriptionRecord;
+  }
+>;
 
 function VisitGroup({
   title,
@@ -151,7 +154,8 @@ function VisitGroup({
   title: string;
   note?: string;
   visits: VisitRow[];
-  actions: (keyof typeof ACTION_LABEL)[];
+  // [status to set, button label]
+  actions: [Exclude<VisitStatus, "offered">, string][];
 }) {
   if (visits.length === 0) return null;
   return (
@@ -162,8 +166,10 @@ function VisitGroup({
       {note && <p className="mt-1 text-lg text-brand-slate-muted">{note}</p>}
       <ul className="mt-4 flex flex-col gap-4">
         {visits.map((visit) => {
-          const { properties: property, subscriptions: subscription } = visit;
-          const customer = property.customers;
+          const property = visit.expand?.property;
+          const customer = property?.expand?.customer;
+          const subscription = visit.expand?.subscription;
+          if (!property || !customer) return null;
           const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(property.street_address)}`;
           return (
             <li key={visit.id} className="rounded-2xl border-4 border-brand-slate-muted/30 p-5">
@@ -176,9 +182,9 @@ function VisitGroup({
               </p>
               <p className="mt-1 text-lg text-brand-slate-muted">
                 {subscription ? getPlan(subscription.plan_type).name : "No plan"}
-                {property.driveway_size_category && ` · ${property.driveway_size_category} driveway`}
-                {property.estimated_square_feet && ` (~${property.estimated_square_feet} sq ft)`}
-                {visit.price != null && ` · Collect ${formatPrice(visit.price)}`}
+                {property.driveway_size && ` · ${property.driveway_size} driveway`}
+                {property.estimated_square_feet > 0 && ` (~${property.estimated_square_feet} sq ft)`}
+                {visit.price > 0 && ` · Collect ${formatPrice(visit.price)}`}
               </p>
               <div className="mt-4 flex flex-wrap gap-3">
                 <a
@@ -189,7 +195,7 @@ function VisitGroup({
                 >
                   Directions
                 </a>
-                {actions.map((status) => (
+                {actions.map(([status, label]) => (
                   <form key={status} action={setVisitStatus}>
                     <input type="hidden" name="visitId" value={visit.id} />
                     <input type="hidden" name="status" value={status} />
@@ -200,7 +206,7 @@ function VisitGroup({
                           : "border-4 border-brand-slate-muted text-brand-slate"
                       }`}
                     >
-                      {ACTION_LABEL[status]}
+                      {label}
                     </button>
                   </form>
                 ))}

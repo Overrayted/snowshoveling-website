@@ -1,6 +1,6 @@
 import "server-only";
-import { cacheLife } from "next/cache";
-import type { DrivewaySize } from "@/lib/supabase/database.types";
+import { getAdminClient, isNotFound } from "@/lib/pocketbase/client";
+import type { DrivewaySize } from "@/lib/pocketbase/types";
 
 export type DrivewayEstimate =
   | { status: "ok"; size: DrivewaySize; squareFeet: number; formattedAddress: string }
@@ -13,25 +13,68 @@ const MAP_ZOOM = 20;
 const MAP_SIZE_PX = 640;
 
 // Never throws. The estimate is a nice-to-have, so failures degrade to
-// "unavailable" and the customer can still pick a plan and sign up.
+// "unavailable" and the customer can still pick a plan and sign up. It also
+// works while PocketBase is down, just without the cache.
 export async function estimateDriveway(address: string): Promise<DrivewayEstimate> {
   if (!process.env.GOOGLE_MAPS_API_KEY || !process.env.GEMINI_API_KEY) {
     return { status: "unavailable" };
   }
+  const key = address.trim().toLowerCase().replace(/\s+/g, " ");
+
+  const cached = await readCachedEstimate(key).catch((error) => {
+    console.error("Estimate cache read failed", error);
+    return null;
+  });
+  if (cached) return cached;
+
+  let estimate: DrivewayEstimate;
   try {
-    return await estimateDrivewayCached(address.trim().toLowerCase());
+    estimate = await computeEstimate(key);
   } catch (error) {
     console.error("Driveway estimate failed", error);
     return { status: "unavailable" };
   }
+  await saveCachedEstimate(key, estimate).catch((error) =>
+    console.error("Estimate cache write failed", error),
+  );
+  return estimate;
 }
 
-// Cached per address so the quote page and the signup action share one
-// Gemini call. Errors throw (and so aren't cached) to allow a retry.
-async function estimateDrivewayCached(address: string): Promise<DrivewayEstimate> {
-  "use cache";
-  cacheLife("weeks");
+// Cached per address (driveways don't change), so the quote page and the
+// signup share one Gemini call. Failed estimates aren't cached, to allow a
+// retry. Delete rows in the driveway_estimates collection to force a redo.
+async function readCachedEstimate(key: string): Promise<DrivewayEstimate | null> {
+  const pb = await getAdminClient();
+  try {
+    const row = await pb
+      .collection("driveway_estimates")
+      .getFirstListItem(pb.filter("address_key = {:key}", { key }));
+    if (row.status === "not_found" || !row.size) return { status: "not_found" };
+    return {
+      status: "ok",
+      size: row.size,
+      squareFeet: row.square_feet,
+      formattedAddress: row.formatted_address,
+    };
+  } catch (error) {
+    if (isNotFound(error)) return null;
+    throw error;
+  }
+}
 
+async function saveCachedEstimate(key: string, estimate: DrivewayEstimate) {
+  if (estimate.status === "unavailable") return;
+  const pb = await getAdminClient();
+  await pb.collection("driveway_estimates").create({
+    address_key: key,
+    status: estimate.status,
+    size: estimate.status === "ok" ? estimate.size : "",
+    square_feet: estimate.status === "ok" ? estimate.squareFeet : 0,
+    formatted_address: estimate.status === "ok" ? estimate.formattedAddress : "",
+  });
+}
+
+async function computeEstimate(address: string): Promise<DrivewayEstimate> {
   const place = await geocode(address);
   if (!place) return { status: "not_found" };
 

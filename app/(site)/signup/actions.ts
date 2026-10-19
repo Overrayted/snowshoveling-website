@@ -5,7 +5,7 @@ import { BUSINESS_PHONE, PLANS, getQuoteAmount } from "@/lib/business";
 import { normalizePhone } from "@/lib/db/customers";
 import { signUpCustomer } from "@/lib/db/signup";
 import { estimateDriveway } from "@/lib/estimator";
-import type { PlanType } from "@/lib/supabase/database.types";
+import type { PlanType } from "@/lib/pocketbase/types";
 
 export type SignupValues = {
   plan: string;

@@ -1,24 +1,24 @@
 import "server-only";
-import { createAdminClient } from "@/lib/supabase/admin";
-import type {
-  PlanType,
-  Subscription,
-  SubscriptionStatus,
-} from "@/lib/supabase/database.types";
+import { localDate } from "@/lib/dates";
+import { getAdminClient, isNotFound } from "@/lib/pocketbase/client";
+import type { PlanType, SubscriptionRecord, SubscriptionStatus } from "@/lib/pocketbase/types";
 
 export async function getActiveSubscription(
   customerId: string,
   propertyId: string,
-): Promise<Subscription | null> {
-  const { data, error } = await createAdminClient()
-    .from("subscriptions")
-    .select()
-    .eq("customer_id", customerId)
-    .eq("property_id", propertyId)
-    .eq("status", "active")
-    .maybeSingle();
-  if (error) throw error;
-  return data;
+): Promise<SubscriptionRecord | null> {
+  const pb = await getAdminClient();
+  try {
+    return await pb.collection("subscriptions").getFirstListItem(
+      pb.filter('customer = {:customerId} && property = {:propertyId} && status = "active"', {
+        customerId,
+        propertyId,
+      }),
+    );
+  } catch (error) {
+    if (isNotFound(error)) return null;
+    throw error;
+  }
 }
 
 export async function createSubscription(input: {
@@ -26,46 +26,35 @@ export async function createSubscription(input: {
   propertyId: string;
   planType: PlanType;
   quoteAmount: number;
-  startDate?: string;
-}): Promise<Subscription> {
-  const { data, error } = await createAdminClient()
-    .from("subscriptions")
-    .insert({
-      customer_id: input.customerId,
-      property_id: input.propertyId,
-      plan_type: input.planType,
-      quote_amount: input.quoteAmount,
-      start_date: input.startDate,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
+}): Promise<SubscriptionRecord> {
+  const pb = await getAdminClient();
+  return pb.collection("subscriptions").create({
+    customer: input.customerId,
+    property: input.propertyId,
+    plan_type: input.planType,
+    status: "active",
+    quote_amount: input.quoteAmount,
+    start_date: localDate(),
+  });
 }
 
 export async function setSubscriptionStatus(
   subscriptionId: string,
   status: SubscriptionStatus,
-): Promise<Subscription> {
-  const { data, error } = await createAdminClient()
-    .from("subscriptions")
-    .update({ status })
-    .eq("id", subscriptionId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
+): Promise<SubscriptionRecord> {
+  const pb = await getAdminClient();
+  return pb.collection("subscriptions").update(subscriptionId, { status });
 }
 
 // Upgrade or downgrade: expire the current active plan and start a new one,
-// keeping the old row as history. The partial unique index on active plans
-// rejects a concurrent double-change instead of creating two active plans.
+// keeping the old row as history. The unique index on active plans rejects a
+// concurrent double-change instead of creating two active plans.
 export async function changePlan(input: {
   customerId: string;
   propertyId: string;
   newPlanType: PlanType;
   quoteAmount: number;
-}): Promise<Subscription> {
+}): Promise<SubscriptionRecord> {
   const current = await getActiveSubscription(input.customerId, input.propertyId);
   if (current?.plan_type === input.newPlanType) return current;
   if (current) await setSubscriptionStatus(current.id, "expired");

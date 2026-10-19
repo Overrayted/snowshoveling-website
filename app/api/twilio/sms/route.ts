@@ -1,11 +1,11 @@
 import { BUSINESS_PHONE } from "@/lib/business";
-import { publicEnv } from "@/lib/env";
+import { siteUrl } from "@/lib/env";
 import { isValidTwilioSignature, twimlMessage } from "@/lib/sms";
 import { handleCustomerReply } from "@/lib/storms";
 
 // Twilio calls this when someone texts our number. In the Twilio console, set
 // the number's "A message comes in" webhook to
-// <NEXT_PUBLIC_SITE_URL>/api/twilio/sms (HTTP POST).
+// <SITE_URL>/api/twilio/sms (HTTP POST).
 export async function POST(request: Request) {
   const form = await request.formData();
   const params = Object.fromEntries(
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
   // Behind a proxy request.url may not match what Twilio signed, so rebuild
   // the public URL from config.
-  const publicUrl = `${publicEnv.siteUrl}/api/twilio/sms`;
+  const publicUrl = `${siteUrl()}/api/twilio/sms`;
   if (!isValidTwilioSignature(publicUrl, params, request.headers.get("x-twilio-signature"))) {
     return new Response("Invalid signature", { status: 403 });
   }

@@ -1,11 +1,12 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getStaff, requireStaff } from "@/lib/auth";
+import { STAFF_COOKIE, STAFF_SESSION_SECONDS, requireStaff } from "@/lib/auth";
 import { addDays, localDate } from "@/lib/dates";
+import { createClient, isValidationError } from "@/lib/pocketbase/client";
 import { startStormDay } from "@/lib/storms";
-import { createClient } from "@/lib/supabase/server";
 
 export type LoginState = { error?: string; email: string };
 
@@ -14,39 +15,42 @@ export async function signIn(_prev: LoginState, formData: FormData): Promise<Log
   const password = String(formData.get("password") ?? "");
   if (!email || !password) return { email, error: "Enter your email and password." };
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return { email, error: "That email and password didn't match." };
-
-  if (!(await getStaff())) {
-    await supabase.auth.signOut();
-    return { email, error: "This account isn't set up as staff yet. Ask the owner to add you." };
+  const pb = createClient();
+  try {
+    await pb.collection("staff").authWithPassword(email, password);
+  } catch (error) {
+    if (isValidationError(error)) return { email, error: "That email and password didn't match." };
+    console.error("Staff sign-in failed", error);
+    return { email, error: "Can't reach the server right now. Try again in a few minutes." };
   }
+
+  (await cookies()).set(STAFF_COOKIE, pb.authStore.token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: STAFF_SESSION_SECONDS,
+  });
   redirect("/staff");
 }
 
 export async function signOut() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  (await cookies()).delete(STAFF_COOKIE);
   redirect("/staff/login");
 }
 
 export async function setVisitStatus(formData: FormData) {
-  const { user, supabase } = await requireStaff();
+  const { staff, pb } = await requireStaff();
   const visitId = String(formData.get("visitId") ?? "");
   const status = String(formData.get("status") ?? "");
   if (status !== "booked" && status !== "done" && status !== "skipped") return;
 
   const done = status === "done";
-  const { error } = await supabase
-    .from("visits")
-    .update({
-      status,
-      completed_at: done ? new Date().toISOString() : null,
-      completed_by: done ? user.id : null,
-    })
-    .eq("id", visitId);
-  if (error) throw error;
+  await pb.collection("visits").update(visitId, {
+    status,
+    completed_at: done ? new Date().toISOString() : "",
+    completed_by: done ? staff.id : "",
+  });
   revalidatePath("/staff");
 }
 
