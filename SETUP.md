@@ -23,6 +23,7 @@ If the homelab goes down:
 | Home page, prices, call button | Signups (customers see "call us at 647-643-7864") |
 | Quote page and driveway estimate | Staff visit list and logins |
 | | Storm texts and YES replies |
+| | Payment confirmations wait: Stripe keeps retrying, and plans activate once it's back |
 
 ## What it costs
 
@@ -35,8 +36,9 @@ If the homelab goes down:
 | Gemini | Estimates driveway size from the photo | Paid tier (see step 4) | A few cents/month |
 | OpenWeatherMap | Snow forecast | Free | $0 |
 | Twilio | Storm texts to customers and staff | Pay as you go | Number about $1–2/month, plus under 1¢ per text |
+| Stripe | Card payments | Pay as you go | A percentage + a few cents per payment (see Stripe's Canadian pricing page) |
 
-Total: roughly **$2–7/month** plus texts.
+Total: roughly **$2–7/month** plus texts and Stripe's per-payment fees.
 
 ## Where settings go
 
@@ -55,11 +57,12 @@ in `.gitignore`).
 
 Needs PocketBase **v0.23 or newer** (tested with v0.40.4).
 
-1. **Add the schema:** copy `pocketbase/pb_migrations/1760900000_kaiyns_init.js`
-   into your PocketBase's `pb_migrations` folder (next to `pb_data`), then
-   restart PocketBase. It creates these collections: `staff`, `customers`,
-   `properties`, `subscriptions`, `storms`, `visits`, `sms_log` and
-   `driveway_estimates`.
+1. **Add the schema:** copy **every file** in `pocketbase/pb_migrations/` into
+   your PocketBase's `pb_migrations` folder (next to `pb_data`), then restart
+   PocketBase. It applies any it hasn't run yet, in order. They create these
+   collections: `staff`, `customers`, `properties`, `subscriptions`, `storms`,
+   `visits`, `sms_log` and `driveway_estimates`. Do the same whenever a new
+   migration file is added.
 2. **Create a superuser just for the website:** PocketBase dashboard →
    **Superusers** → **New**, e.g. `website@kaiyns.ca` with a long random
    password. Don't reuse your own login.
@@ -194,19 +197,66 @@ Do this after step 5, because Twilio needs the live web address.
 Twilio handles STOP/START replies by itself, and the site also records STOP so
 that customer isn't offered visits again.
 
-## 8. Test everything with your own phone
+## 8. Stripe (payments)
+
+How customers pay:
+
+| Plan | At signup | After that |
+|---|---|---|
+| One Storm | Card saved on Stripe's page, **nothing charged** | $50 charged automatically when staff press **Mark done** |
+| Monthly | $300 | $300 every month until `SEASON_END_DATE`, then it stops |
+| Full Season | $1,000 | Nothing; the plan ends after `SEASON_END_DATE` |
+
+A plan only becomes active (and gets booked on storm days) once Stripe
+confirms payment. Until then it shows as `pending` in PocketBase.
+
+1. Sign up at [stripe.com](https://stripe.com) and activate your account for
+   Canada. Everything below works in **test mode** first (toggle at the top of
+   the dashboard), so you can try it with fake cards before taking real money.
+2. **Developers → API keys**: copy the **Secret key** (`sk_test_…` in test
+   mode) → `STRIPE_SECRET_KEY`.
+3. **Developers → Webhooks → Add endpoint**:
+   - URL: `https://kaiyns.ca/api/stripe/webhook`
+   - Events: `checkout.session.completed`, `customer.subscription.updated`,
+     `customer.subscription.deleted`
+   - Copy the endpoint's **Signing secret** (`whsec_…`) → `STRIPE_WEBHOOK_SECRET`
+4. Set `SEASON_END_DATE` (e.g. `2027-04-30`) and **update it every year**
+   before the next season's signups.
+5. **Settings → Business → Customer emails**: turn on receipts for successful
+   payments, if you'd like customers to get emailed receipts.
+
+**Going live:** switch the dashboard to live mode, create a new webhook
+endpoint there (live and test webhooks are separate), and replace both Stripe
+secrets in Cloudflare with the live `sk_live_…` and live `whsec_…` values.
+
+**Everyday tasks in the Stripe dashboard:**
+- **Cancel a Monthly plan:** Customers → the customer → their subscription →
+  Cancel. The site sees this and ends the plan.
+- **Refunds:** Payments → the payment → Refund. Changing a customer from
+  Monthly to Full Season cancels the Monthly subscription but doesn't refund
+  the current month automatically; refund it here if you want to.
+- **Declined One Storm cards:** shown in red on the staff visit list with the
+  reason and a **Try charging $50 again** button.
+
+## 9. Test everything with your own phone
 
 1. On the live site, enter your address and check the quote page shows a
    driveway size.
-2. Sign up as a **One Storm** customer with your own phone number, and tick
-   "Text me when snow is coming".
+2. With Stripe in **test mode**, sign up as a **One Storm** customer with your
+   own phone number, tick "Text me when snow is coming", and on Stripe's page
+   use the test card `4242 4242 4242 4242` (any future date, any CVC).
+   Check PocketBase: your plan should change from `pending` to `active`
+   within a few seconds.
 3. Log in at `/staff` → **Start a storm day** for tomorrow.
 4. You should get:
    - the offer text ("Snow is on the way… Reply YES to book")
    - the staff summary text (if your staff record has a phone number)
 5. Reply **YES**. You should get a confirmation, and your house should move to
    **To shovel** on the staff page.
-6. Clean up in PocketBase: delete the test record in `storms` (its visits go
+6. Press **Mark done**. It should show **Paid $50 ✓**, and the payment should
+   appear in Stripe → Payments. To test a decline, sign up another test
+   customer with card `4000 0000 0000 0341` (saves fine, declines when charged).
+7. Clean up in PocketBase: delete the test record in `storms` (its visits go
    with it), then your test customer in `customers`.
 
 If something doesn't work, check **Cloudflare → Workers → kaiyns → Logs** for

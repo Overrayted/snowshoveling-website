@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { BUSINESS_PHONE, PLANS, getQuoteAmount } from "@/lib/business";
 import { normalizePhone } from "@/lib/db/customers";
-import { signUpCustomer } from "@/lib/db/signup";
+import { signUpCustomer, type SignupResult } from "@/lib/db/signup";
 import { estimateDriveway } from "@/lib/estimator";
 import type { PlanType } from "@/lib/pocketbase/types";
 
@@ -52,8 +52,9 @@ export async function submitSignup(
   const drivewaySize = estimate.status === "ok" ? estimate.size : null;
   const estimatedSquareFeet = estimate.status === "ok" ? estimate.squareFeet : null;
 
+  let result: SignupResult;
   try {
-    await signUpCustomer({
+    result = await signUpCustomer({
       fullName: values.fullName,
       phoneNumber: phone,
       address: values.address,
@@ -74,5 +75,7 @@ export async function submitSignup(
   }
 
   // redirect() throws, so it must stay outside the try/catch
-  redirect(`/thank-you?plan=${plan.type}`);
+  if (result.status === "already_active") redirect(`/thank-you?plan=${plan.type}&already=1`);
+  // On to Stripe's secure payment page
+  redirect(result.checkoutUrl);
 }

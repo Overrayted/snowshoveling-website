@@ -21,7 +21,9 @@ export async function getActiveSubscription(
   }
 }
 
-export async function createSubscription(input: {
+// New plans start as "pending" and become active once Stripe confirms
+// payment (see lib/payments.ts).
+export async function createPendingSubscription(input: {
   customerId: string;
   propertyId: string;
   planType: PlanType;
@@ -32,37 +34,37 @@ export async function createSubscription(input: {
     customer: input.customerId,
     property: input.propertyId,
     plan_type: input.planType,
-    status: "active",
+    status: "pending",
     quote_amount: input.quoteAmount,
     start_date: localDate(),
   });
+}
+
+export async function updateSubscription(
+  id: string,
+  fields: Partial<Pick<SubscriptionRecord, "status" | "stripe_checkout_session" | "stripe_subscription_id">>,
+): Promise<SubscriptionRecord> {
+  const pb = await getAdminClient();
+  return pb.collection("subscriptions").update(id, fields);
 }
 
 export async function setSubscriptionStatus(
   subscriptionId: string,
   status: SubscriptionStatus,
 ): Promise<SubscriptionRecord> {
-  const pb = await getAdminClient();
-  return pb.collection("subscriptions").update(subscriptionId, { status });
+  return updateSubscription(subscriptionId, { status });
 }
 
-// Upgrade or downgrade: expire the current active plan and start a new one,
-// keeping the old row as history. The unique index on active plans rejects a
-// concurrent double-change instead of creating two active plans.
-export async function changePlan(input: {
-  customerId: string;
-  propertyId: string;
-  newPlanType: PlanType;
-  quoteAmount: number;
-}): Promise<SubscriptionRecord> {
-  const current = await getActiveSubscription(input.customerId, input.propertyId);
-  if (current?.plan_type === input.newPlanType) return current;
-  if (current) await setSubscriptionStatus(current.id, "expired");
-
-  return createSubscription({
-    customerId: input.customerId,
-    propertyId: input.propertyId,
-    planType: input.newPlanType,
-    quoteAmount: input.quoteAmount,
+// Full Season plans have no Stripe subscription to end them, so the daily
+// storm check expires them once the season is over.
+export async function expireFullSeasonPlans(seasonEnd: string): Promise<number> {
+  if (localDate() <= seasonEnd) return 0;
+  const pb = await getAdminClient();
+  const ended = await pb.collection("subscriptions").getFullList({
+    filter: pb.filter('plan_type = "full_season" && status = "active" && start_date <= {:end}', {
+      end: seasonEnd,
+    }),
   });
+  for (const sub of ended) await setSubscriptionStatus(sub.id, "expired");
+  return ended.length;
 }

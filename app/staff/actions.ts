@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { STAFF_COOKIE, STAFF_SESSION_SECONDS, requireStaff } from "@/lib/auth";
 import { addDays, localDate } from "@/lib/dates";
+import { chargeVisit } from "@/lib/payments";
 import { createClient, isValidationError } from "@/lib/pocketbase/client";
 import { startStormDay } from "@/lib/storms";
 
@@ -51,6 +52,15 @@ export async function setVisitStatus(formData: FormData) {
     completed_at: done ? new Date().toISOString() : "",
     completed_by: done ? staff.id : "",
   });
+  // One Storm visits are charged to the saved card once the job is done
+  if (done) await chargeVisit(visitId);
+  revalidatePath("/staff");
+}
+
+// After a declined card: the customer fixed it (or staff called them)
+export async function retryVisitCharge(formData: FormData) {
+  await requireStaff();
+  await chargeVisit(String(formData.get("visitId") ?? ""));
   revalidatePath("/staff");
 }
 

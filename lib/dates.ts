@@ -28,3 +28,10 @@ export function formatServiceDate(date: string): string {
     day: "numeric",
   });
 }
+
+// Last day of the snow season (SEASON_END_DATE, YYYY-MM-DD). Monthly plans
+// stop renewing after it and Full Season plans expire. Null if not set.
+export function seasonEndDate(): string | null {
+  const value = process.env.SEASON_END_DATE;
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}

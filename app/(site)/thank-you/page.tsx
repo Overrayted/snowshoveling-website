@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { CallButton } from "@/components/call-button";
-import { PLANS } from "@/lib/business";
+import { PLANS, formatPrice } from "@/lib/business";
 
 export const metadata: Metadata = {
   title: "Thank you | Kaiyns Snow Shovelling",
@@ -18,9 +18,7 @@ export default function ThankYouPage(props: PageProps<"/thank-you">) {
       <Suspense fallback={null}>
         <PlanLine searchParams={props.searchParams} />
       </Suspense>
-      <p className="mt-6 text-xl">
-        We&apos;ll call you soon to confirm your details and arrange payment.
-      </p>
+      <p className="mt-6 text-xl">We&apos;ll call you soon to say hello and confirm your details.</p>
       <p className="mt-10 text-xl">Questions? We&apos;re happy to help.</p>
       <CallButton variant="blue" label="Call" className="mt-4" />
       <p className="mt-10">
@@ -33,12 +31,22 @@ export default function ThankYouPage(props: PageProps<"/thank-you">) {
 }
 
 async function PlanLine({ searchParams }: Pick<PageProps<"/thank-you">, "searchParams">) {
-  const { plan: type } = await searchParams;
+  const { plan: type, already } = await searchParams;
   const plan = PLANS.find((p) => p.type === type);
   if (!plan) return null;
   return (
-    <p className="mt-6 text-xl">
-      Your plan: <strong>{plan.name}</strong>.
-    </p>
+    <>
+      <p className="mt-6 text-xl">
+        Your plan: <strong>{plan.name}</strong>.
+      </p>
+      {already === "1" && (
+        <p className="mt-2 text-xl">You were already signed up for this plan, so nothing new was charged.</p>
+      )}
+      {plan.type === "one_time" && !already && (
+        <p className="mt-2 text-xl">
+          Your card is saved. We only charge {formatPrice(plan.price)} after a visit you book.
+        </p>
+      )}
+    </>
   );
 }

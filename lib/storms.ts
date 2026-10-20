@@ -62,6 +62,8 @@ export async function startStormDay(input: {
         subscription: sub.id,
         status: isOneTime ? "offered" : "booked",
         price: isOneTime ? getPlan("one_time").price : 0,
+        // One Storm visits are charged to the saved card once marked done
+        payment_status: isOneTime ? "due" : "not_needed",
         booked_at: isOneTime ? "" : now,
       });
     } catch (error) {
@@ -160,7 +162,8 @@ function offerMessage(storm: StormRecord): string {
   return (
     `Kaiyns Snow Shovelling: snow is on the way${snow}. ` +
     `Would you like us to shovel your driveway on ${day}? ` +
-    `It's ${price}, no HST. Reply YES to book, or call ${BUSINESS_PHONE.display}. ` +
+    `It's ${price}, no HST, charged to your card on file after we shovel. ` +
+    `Reply YES to book, or call ${BUSINESS_PHONE.display}. ` +
     `Reply STOP to stop these texts.`
   );
 }
@@ -239,7 +242,7 @@ export async function handleCustomerReply(fromPhone: string, text: string): Prom
   });
   return (
     `Thank you! You're booked: we'll shovel your driveway on ${day}. ` +
-    `The price is ${formatPrice(getPlan("one_time").price)}, no HST. ` +
+    `We'll charge ${formatPrice(getPlan("one_time").price)} (no HST) to your card on file after we shovel. ` +
     `Questions? Call us at ${BUSINESS_PHONE.display}.`
   );
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { formatServiceDate, seasonEndDate } from "@/lib/dates";
 import { SignupForm } from "./signup-form";
 
 export const metadata: Metadata = {
@@ -21,6 +22,7 @@ export default function SignupPage(props: PageProps<"/signup">) {
 async function PrefilledForm({ searchParams }: Pick<PageProps<"/signup">, "searchParams">) {
   const params = await searchParams;
   const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
+  const seasonEnd = seasonEndDate();
 
   return (
     <SignupForm
@@ -31,6 +33,9 @@ async function PrefilledForm({ searchParams }: Pick<PageProps<"/signup">, "searc
         address: first(params.address),
         smsOptIn: false,
       }}
+      // "Thursday, April 30" -> "April 30"
+      seasonEnd={seasonEnd ? formatServiceDate(seasonEnd).replace(/^\w+, /, "") : null}
+      paymentCancelled={first(params.cancelled) === "1"}
     />
   );
 }

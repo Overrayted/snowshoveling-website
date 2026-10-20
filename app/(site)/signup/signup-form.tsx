@@ -1,13 +1,24 @@
 "use client";
 
 import { useActionState } from "react";
-import { BUSINESS_PHONE, PLANS, formatPrice } from "@/lib/business";
+import { BUSINESS_PHONE, PLANS, formatPrice, getPlan } from "@/lib/business";
 import { submitSignup, type SignupState, type SignupValues } from "./actions";
 
-export function SignupForm({ initialValues }: { initialValues: SignupValues }) {
+export function SignupForm({
+  initialValues,
+  seasonEnd,
+  paymentCancelled,
+}: {
+  initialValues: SignupValues;
+  seasonEnd: string | null; // e.g. "April 30"
+  paymentCancelled: boolean;
+}) {
   const [state, formAction, pending] = useActionState<SignupState, FormData>(submitSignup, {
     values: initialValues,
     errors: {},
+    formError: paymentCancelled
+      ? `Your payment wasn't finished, so you're not signed up yet. You can try again below, or call us at ${BUSINESS_PHONE.display}.`
+      : undefined,
   });
   const { values, errors } = state;
 
@@ -90,16 +101,29 @@ export function SignupForm({ initialValues }: { initialValues: SignupValues }) {
       </fieldset>
 
       <div>
-        <p className="text-xl">
-          Nothing to pay online. We&apos;ll call you to confirm and arrange payment. No HST
-          is charged.
+        <p className="text-xl font-bold">Next: pay safely with Stripe</p>
+        <p className="mt-2">
+          You&apos;ll go to Stripe&apos;s secure page to enter your card. No HST is charged.
         </p>
+        <ul className="mt-3 list-disc space-y-2 pl-6">
+          <li>
+            <strong>One Storm:</strong> nothing is charged today. We save your card and charge{" "}
+            {formatPrice(getPlan("one_time").price)} after each visit you book.
+          </li>
+          <li>
+            <strong>Monthly:</strong> {formatPrice(getPlan("monthly").price)} today, then once a
+            month{seasonEnd ? ` until ${seasonEnd}` : ""}.
+          </li>
+          <li>
+            <strong>Full Season:</strong> {formatPrice(getPlan("full_season").price)} today, once.
+          </li>
+        </ul>
         <button
           type="submit"
           disabled={pending}
           className="mt-6 min-h-16 w-full rounded-2xl bg-brand-blue px-8 text-2xl font-bold text-brand-white shadow-md transition-colors hover:bg-brand-blue-dark disabled:opacity-70 sm:w-auto"
         >
-          {pending ? "Saving…" : "Sign me up"}
+          {pending ? "One moment…" : "Continue to payment"}
         </button>
         <p className="mt-6">
           Questions? Call us at{" "}

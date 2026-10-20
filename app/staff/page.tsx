@@ -11,7 +11,7 @@ import type {
   VisitStatus,
   WithExpand,
 } from "@/lib/pocketbase/types";
-import { setVisitStatus, signOut, startManualStormDay } from "./actions";
+import { retryVisitCharge, setVisitStatus, signOut, startManualStormDay } from "./actions";
 
 export default function StaffPage(props: PageProps<"/staff">) {
   return (
@@ -184,8 +184,8 @@ function VisitGroup({
                 {subscription ? getPlan(subscription.plan_type).name : "No plan"}
                 {property.driveway_size && ` · ${property.driveway_size} driveway`}
                 {property.estimated_square_feet > 0 && ` (~${property.estimated_square_feet} sq ft)`}
-                {visit.price > 0 && ` · Collect ${formatPrice(visit.price)}`}
               </p>
+              <PaymentLine visit={visit} />
               <div className="mt-4 flex flex-wrap gap-3">
                 <a
                   href={mapsUrl}
@@ -217,6 +217,31 @@ function VisitGroup({
       </ul>
     </div>
   );
+}
+
+// One Storm visits are charged to the customer's saved card when marked done.
+function PaymentLine({ visit }: { visit: VisitRow }) {
+  const amount = formatPrice(visit.price);
+  switch (visit.payment_status) {
+    case "due":
+      return <p className="mt-1 text-lg">Charges {amount} to their card when marked done</p>;
+    case "paid":
+      return <p className="mt-1 text-lg font-bold text-green-800">Paid {amount} ✓</p>;
+    case "failed":
+      return (
+        <div role="alert" className="mt-3 rounded-xl border-4 border-red-700 bg-red-50 p-4">
+          <p className="text-lg font-bold text-red-800">Not paid: {visit.payment_error}</p>
+          <form action={retryVisitCharge} className="mt-3">
+            <input type="hidden" name="visitId" value={visit.id} />
+            <button className="min-h-12 rounded-xl border-4 border-red-700 bg-brand-white px-4 text-lg font-bold text-red-800">
+              Try charging {amount} again
+            </button>
+          </form>
+        </div>
+      );
+    default:
+      return null;
+  }
 }
 
 function StartStormDayForm({ defaultDate, minDate }: { defaultDate: string; minDate: string }) {

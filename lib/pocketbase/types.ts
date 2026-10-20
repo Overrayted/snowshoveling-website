@@ -6,8 +6,10 @@ import type { RecordService } from "pocketbase";
 
 export type DrivewaySize = "small" | "medium" | "large";
 export type PlanType = "one_time" | "monthly" | "full_season";
-export type SubscriptionStatus = "active" | "paused" | "expired";
+// pending: signed up, waiting for Stripe checkout to complete
+export type SubscriptionStatus = "pending" | "active" | "paused" | "expired";
 export type VisitStatus = "offered" | "booked" | "done" | "skipped";
+export type PaymentStatus = "not_needed" | "due" | "paid" | "failed";
 
 type BaseRecord = {
   id: string;
@@ -29,6 +31,8 @@ export type CustomerRecord = BaseRecord & {
   address: string;
   sms_opt_in: boolean;
   sms_opt_in_at: string;
+  stripe_customer_id: string;
+  stripe_payment_method: string;
 };
 
 export type PropertyRecord = BaseRecord & {
@@ -45,6 +49,8 @@ export type SubscriptionRecord = BaseRecord & {
   status: SubscriptionStatus;
   quote_amount: number;
   start_date: string;
+  stripe_checkout_session: string;
+  stripe_subscription_id: string;
 };
 
 export type StormRecord = BaseRecord & {
@@ -62,6 +68,10 @@ export type VisitRecord = BaseRecord & {
   booked_at: string;
   completed_at: string;
   completed_by: string;
+  payment_status: PaymentStatus | "";
+  stripe_payment_intent: string;
+  payment_error: string;
+  payment_attempts: number;
 };
 
 export type SmsLogRecord = BaseRecord & {
