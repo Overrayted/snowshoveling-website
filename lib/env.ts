@@ -10,7 +10,7 @@ export function requireEnv(name: string): string {
   return value;
 }
 
-// The public address of the site, e.g. https://kaiyns.ca (no trailing slash).
+// The public address of the site, e.g. https://kaiyns.com (no trailing slash).
 // Read at request time, so it can be set in Cloudflare's runtime settings.
 export function siteUrl(): string {
   return (process.env.SITE_URL || "http://localhost:3000").replace(/\/$/, "");
