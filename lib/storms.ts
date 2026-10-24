@@ -162,7 +162,7 @@ function offerMessage(storm: StormRecord): string {
   return (
     `Kaiyns Snow Shovelling: snow is on the way${snow}. ` +
     `Would you like us to shovel your driveway on ${day}? ` +
-    `It's ${price}, no HST, charged to your card on file after we shovel. ` +
+    `It's ${price}, charged to your card on file after we shovel. ` +
     `Reply YES to book. Questions? You can ${CONTACT_US}. ` +
     `Reply STOP to stop these texts.`
   );
@@ -242,7 +242,7 @@ export async function handleCustomerReply(fromPhone: string, text: string): Prom
   });
   return (
     `Thank you! You're booked: we'll shovel your driveway on ${day}. ` +
-    `We'll charge ${formatPrice(getPlan("one_time").price)} (no HST) to your card on file after we shovel. ` +
+    `We'll charge ${formatPrice(getPlan("one_time").price)} to your card on file after we shovel. ` +
     `Questions? You can ${CONTACT_US}.`
   );
 }
