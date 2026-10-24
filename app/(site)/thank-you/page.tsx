@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { CallButton } from "@/components/call-button";
+import { EmailButton, PhoneLine } from "@/components/contact-button";
 import { PLANS, formatPrice } from "@/lib/business";
 
 export const metadata: Metadata = {
@@ -20,7 +20,8 @@ export default function ThankYouPage(props: PageProps<"/thank-you">) {
       </Suspense>
       <p className="mt-6 text-xl">We&apos;ll call you soon to say hello and confirm your details.</p>
       <p className="mt-10 text-xl">Questions? We&apos;re happy to help.</p>
-      <CallButton variant="blue" label="Call" className="mt-4" />
+      <EmailButton variant="blue" className="mt-4" />
+      <PhoneLine className="mt-3" />
       <p className="mt-10">
         <Link href="/" className="text-xl font-bold text-brand-blue underline underline-offset-4">
           Back to the home page

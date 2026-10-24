@@ -1,14 +1,11 @@
 import Form from "next/form";
-import { CallButton } from "@/components/call-button";
-import { NoHstNote, PlanCard } from "@/components/plan-card";
-import { PLANS } from "@/lib/business";
+import { EmailButton, PhoneLine } from "@/components/contact-button";
 
 export default function Home() {
   return (
     <>
       <Hero />
       <HowItWorks />
-      <Pricing />
       <TalkToUs />
     </>
   );
@@ -22,8 +19,8 @@ function Hero() {
           We shovel your driveway, so you don&apos;t have to.
         </h1>
         <p className="mt-6 max-w-2xl text-xl sm:text-2xl">
-          Friendly, reliable snow clearing for families and seniors. Get your
-          free price in under a minute.
+          Friendly, reliable snow clearing for families and seniors. Get a free
+          quote for your home in under a minute.
         </p>
 
         <Form
@@ -50,7 +47,7 @@ function Hero() {
               type="submit"
               className="min-h-16 rounded-2xl bg-brand-blue px-8 text-xl font-bold text-brand-white shadow-md transition-colors hover:bg-brand-blue-dark"
             >
-              Get my free price
+              Get my free quote
             </button>
           </div>
         </Form>
@@ -100,40 +97,18 @@ function HowItWorks() {
   );
 }
 
-function Pricing() {
-  return (
-    <section aria-labelledby="pricing-heading" className="bg-brand-cyan-light">
-      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <h2 id="pricing-heading" className="text-3xl font-bold sm:text-4xl">
-          Simple, honest prices
-        </h2>
-        <p className="mt-4 max-w-3xl">
-          The same price for every driveway. You can upgrade or change your plan
-          at any time.
-        </p>
-
-        <ul className="mt-10 grid gap-6 md:grid-cols-3">
-          {PLANS.map((plan) => (
-            <PlanCard key={plan.type} plan={plan} />
-          ))}
-        </ul>
-        <NoHstNote />
-      </div>
-    </section>
-  );
-}
-
 function TalkToUs() {
   return (
     <section aria-labelledby="talk-heading" className="mx-auto max-w-6xl px-4 py-16 text-center sm:px-6">
       <h2 id="talk-heading" className="text-3xl font-bold sm:text-4xl">
-        Rather talk to a person?
+        Have a question?
       </h2>
       <p className="mx-auto mt-4 max-w-2xl">
-        Give us a call. We&apos;re happy to answer questions and sign you up over
-        the phone.
+        Send us an email. We&apos;re happy to answer questions and help you sign
+        up.
       </p>
-      <CallButton variant="blue" label="Call" className="mt-8 px-10 text-2xl" />
+      <EmailButton variant="blue" className="mt-8 max-w-full sm:px-10 sm:text-2xl" />
+      <PhoneLine className="mt-4" />
     </section>
   );
 }

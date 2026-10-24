@@ -1,10 +1,19 @@
 import type { DrivewaySize, PlanType } from "@/lib/pocketbase/types";
 
+// Email is the main way to reach us; the phone number is shown smaller, second.
+export const BUSINESS_EMAIL = {
+  address: "support@kaiyns.com",
+  href: "mailto:support@kaiyns.com",
+};
+
 export const BUSINESS_PHONE = {
   e164: "+16476437864",
   display: "647-643-7864",
   href: "tel:+16476437864",
 };
+
+// For error messages and texts: "email support@kaiyns.com or call 647-643-7864"
+export const CONTACT_US = `email ${BUSINESS_EMAIL.address} or call ${BUSINESS_PHONE.display}`;
 
 // We're a small, student-run business and don't charge HST, so every price
 // shown is the final price.
@@ -23,7 +32,7 @@ export type Plan = {
 export const PLANS: Plan[] = [
   {
     type: "one_time",
-    name: "One Storm",
+    name: "One Time",
     price: 50,
     priceUnit: "per visit",
     summary: "We clear your driveway once, when you need it. No commitment.",

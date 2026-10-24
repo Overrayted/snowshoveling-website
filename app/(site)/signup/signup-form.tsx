@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { BUSINESS_PHONE, PLANS, formatPrice, getPlan } from "@/lib/business";
+import { BUSINESS_EMAIL, BUSINESS_PHONE, CONTACT_US, PLANS, formatPrice, getPlan } from "@/lib/business";
 import { submitSignup, type SignupState, type SignupValues } from "./actions";
 
 export function SignupForm({
@@ -17,7 +17,7 @@ export function SignupForm({
     values: initialValues,
     errors: {},
     formError: paymentCancelled
-      ? `Your payment wasn't finished, so you're not signed up yet. You can try again below, or call us at ${BUSINESS_PHONE.display}.`
+      ? `Your payment wasn't finished, so you're not signed up yet. You can try again below, or ${CONTACT_US}.`
       : undefined,
   });
   const { values, errors } = state;
@@ -93,7 +93,7 @@ export function SignupForm({
           <span>
             <span className="block text-xl font-bold">Text me when snow is coming</span>
             <span className="block">
-              One Storm customers: we&apos;ll text you before a snowfall so you can
+              One Time customers: we&apos;ll text you before a snowfall so you can
               book a visit by replying YES. Reply STOP any time to stop.
             </span>
           </span>
@@ -107,7 +107,7 @@ export function SignupForm({
         </p>
         <ul className="mt-3 list-disc space-y-2 pl-6">
           <li>
-            <strong>One Storm:</strong> nothing is charged today. We save your card and charge{" "}
+            <strong>One Time:</strong> nothing is charged today. We save your card and charge{" "}
             {formatPrice(getPlan("one_time").price)} after each visit you book.
           </li>
           <li>
@@ -126,11 +126,17 @@ export function SignupForm({
           {pending ? "One moment…" : "Continue to payment"}
         </button>
         <p className="mt-6">
-          Questions? Call us at{" "}
-          <a href={BUSINESS_PHONE.href} className="font-bold text-brand-blue underline underline-offset-4">
-            {BUSINESS_PHONE.display}
+          Questions? Email us at{" "}
+          <a href={BUSINESS_EMAIL.href} className="font-bold text-brand-blue underline underline-offset-4">
+            {BUSINESS_EMAIL.address}
           </a>
           .
+        </p>
+        <p className="mt-1 text-lg text-brand-slate-muted">
+          Or call{" "}
+          <a href={BUSINESS_PHONE.href} className="whitespace-nowrap underline underline-offset-4">
+            {BUSINESS_PHONE.display}
+          </a>
         </p>
       </div>
     </form>

@@ -1,5 +1,5 @@
 import "server-only";
-import { BUSINESS_PHONE, formatPrice, getPlan } from "@/lib/business";
+import { CONTACT_US, formatPrice, getPlan } from "@/lib/business";
 import { formatServiceDate, localDate } from "@/lib/dates";
 import { siteUrl } from "@/lib/env";
 import { getAdminClient, isNotFound, isValidationError } from "@/lib/pocketbase/client";
@@ -62,7 +62,7 @@ export async function startStormDay(input: {
         subscription: sub.id,
         status: isOneTime ? "offered" : "booked",
         price: isOneTime ? getPlan("one_time").price : 0,
-        // One Storm visits are charged to the saved card once marked done
+        // One Time visits are charged to the saved card once marked done
         payment_status: isOneTime ? "due" : "not_needed",
         booked_at: isOneTime ? "" : now,
       });
@@ -163,7 +163,7 @@ function offerMessage(storm: StormRecord): string {
     `Kaiyns Snow Shovelling: snow is on the way${snow}. ` +
     `Would you like us to shovel your driveway on ${day}? ` +
     `It's ${price}, no HST, charged to your card on file after we shovel. ` +
-    `Reply YES to book, or call ${BUSINESS_PHONE.display}. ` +
+    `Reply YES to book. Questions? You can ${CONTACT_US}. ` +
     `Reply STOP to stop these texts.`
   );
 }
@@ -208,7 +208,7 @@ export async function handleCustomerReply(fromPhone: string, text: string): Prom
   }
   if (["start", "unstop", "help", "info"].includes(word)) return null;
 
-  const callUs = `call us at ${BUSINESS_PHONE.display}`;
+  const callUs = CONTACT_US;
   if (!customer) {
     return `Kaiyns Snow Shovelling: we couldn't find your number in our list. Please ${callUs}.`;
   }
@@ -243,6 +243,6 @@ export async function handleCustomerReply(fromPhone: string, text: string): Prom
   return (
     `Thank you! You're booked: we'll shovel your driveway on ${day}. ` +
     `We'll charge ${formatPrice(getPlan("one_time").price)} (no HST) to your card on file after we shovel. ` +
-    `Questions? Call us at ${BUSINESS_PHONE.display}.`
+    `Questions? You can ${CONTACT_US}.`
   );
 }

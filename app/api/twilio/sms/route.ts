@@ -1,4 +1,4 @@
-import { BUSINESS_PHONE } from "@/lib/business";
+import { CONTACT_US } from "@/lib/business";
 import { siteUrl } from "@/lib/env";
 import { isValidTwilioSignature, twimlMessage } from "@/lib/sms";
 import { handleCustomerReply } from "@/lib/storms";
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error("SMS reply handling failed", err);
     return twimlMessage(
-      `Sorry, something went wrong on our end. Please call us at ${BUSINESS_PHONE.display}.`,
+      `Sorry, something went wrong on our end. Please ${CONTACT_US}.`,
     );
   }
 }

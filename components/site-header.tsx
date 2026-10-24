@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { CallButton } from "./call-button";
+import { BUSINESS_PHONE } from "@/lib/business";
+import { EmailButton } from "./contact-button";
 
 export function SiteHeader() {
   return (
@@ -17,19 +18,28 @@ export function SiteHeader() {
           />
         </Link>
         {/* Hidden on phones, where the sticky bottom bar takes over */}
-        <div className="hidden sm:block">
-          <CallButton variant="cyan" label="Call us:" />
+        <div className="hidden flex-col items-end gap-1 sm:flex">
+          <EmailButton variant="light" label="Email us:" />
+          <a
+            href={BUSINESS_PHONE.href}
+            className="text-lg text-brand-white underline underline-offset-4"
+          >
+            or call <span className="whitespace-nowrap font-bold">{BUSINESS_PHONE.display}</span>
+          </a>
         </div>
       </div>
     </header>
   );
 }
 
-// Always-visible call button pinned to the bottom of small screens.
-export function MobileCallBar() {
+// Always-visible contact bar pinned to the bottom of small screens.
+export function MobileContactBar() {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 border-t-4 border-brand-blue-dark bg-brand-blue px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:hidden">
-      <CallButton variant="cyan" label="Call" className="w-full" />
+    <div className="fixed inset-x-0 bottom-0 z-50 border-t-4 border-brand-blue-dark bg-brand-blue px-4 pt-3 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] text-center text-brand-white sm:hidden">
+      <EmailButton variant="light" label="" className="w-full" />
+      <a href={BUSINESS_PHONE.href} className="mt-1 inline-block text-lg underline underline-offset-4">
+        or call <span className="whitespace-nowrap font-bold">{BUSINESS_PHONE.display}</span>
+      </a>
     </div>
   );
 }

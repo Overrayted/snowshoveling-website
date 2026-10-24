@@ -1,7 +1,7 @@
 import "server-only";
 import type Stripe from "stripe";
 import { formatPrice, getPlan } from "@/lib/business";
-import { formatServiceDate, seasonEndDate } from "@/lib/dates";
+import { formatServiceDate, localDate, seasonEndDate } from "@/lib/dates";
 import { getActiveSubscription, setSubscriptionStatus, updateSubscription } from "@/lib/db/subscriptions";
 import { siteUrl } from "@/lib/env";
 import { getAdminClient, isNotFound } from "@/lib/pocketbase/client";
@@ -16,7 +16,7 @@ import type {
 import { getStripe, toCents } from "@/lib/stripe";
 
 // How each plan is paid:
-//   One Storm:   card saved at signup (Checkout "setup" mode), charged $50
+//   One Time:   card saved at signup (Checkout "setup" mode), charged $50
 //                when a visit is marked done (chargeVisit below)
 //   Monthly:     Stripe subscription, renews monthly until the season ends
 //   Full Season: one payment at signup
@@ -175,7 +175,32 @@ async function activate(subscription: SubscriptionRecord) {
       await getStripe().subscriptions.cancel(previous.stripe_subscription_id);
     }
   }
+  // Runs before the plan turns active so a failure is retried with the webhook
+  if (subscription.plan_type !== "one_time") await coverOpenVisits(subscription);
   await setSubscriptionStatus(subscription.id, "active");
+}
+
+// A One Time customer who upgrades after being texted about a storm: their
+// uncharged $50 visits for today or later become part of the new plan, so
+// marking them done doesn't charge on top of it. Finished visits and past
+// storms are left alone; those were One Time visits and are still owed.
+async function coverOpenVisits(subscription: SubscriptionRecord) {
+  const pb = await getAdminClient();
+  const visits = await pb.collection("visits").getFullList({
+    filter: pb.filter(
+      'property = {:property} && payment_status = "due" && status != "done" && storm.service_date >= {:today}',
+      { property: subscription.property, today: localDate() },
+    ),
+  });
+  for (const visit of visits) {
+    await pb.collection("visits").update(visit.id, {
+      subscription: subscription.id,
+      price: 0,
+      payment_status: "not_needed",
+      // Subscribers are booked automatically, like on a normal storm day
+      ...(visit.status === "offered" && { status: "booked", booked_at: new Date().toISOString() }),
+    });
+  }
 }
 
 // Stripe webhook: a Monthly subscription changed (renewal failed, cancelled,
@@ -214,7 +239,7 @@ type VisitWithCustomer = WithExpand<
   { storm: StormRecord; property: WithExpand<PropertyRecord, { customer: CustomerRecord }> }
 >;
 
-// Charges a One Storm visit to the card saved at signup. Called when staff
+// Charges a One Time visit to the card saved at signup. Called when staff
 // mark the visit done, or press "Try charge again" after a decline. Never
 // charges twice: a paid visit is skipped, and each attempt has its own
 // Stripe idempotency key.

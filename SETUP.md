@@ -230,7 +230,7 @@ How customers pay:
 
 | Plan | At signup | After that |
 |---|---|---|
-| One Storm | Card saved on Stripe's page, **nothing charged** | $50 charged automatically when staff press **Mark done** |
+| One Time | Card saved on Stripe's page, **nothing charged** | $50 charged automatically when staff press **Mark done** |
 | Monthly | $300 | $300 every month until `SEASON_END_DATE`, then it stops |
 | Full Season | $1,000 | Nothing; the plan ends after `SEASON_END_DATE` |
 
@@ -343,14 +343,14 @@ webhooks are separate), then replace both Stripe secrets with the live
 - **Refunds:** Payments → the payment → Refund. Changing a customer from
   Monthly to Full Season cancels the Monthly subscription but doesn't refund
   the current month automatically; refund it here if you want to.
-- **Declined One Storm cards:** shown in red on the staff visit list with the
+- **Declined One Time cards:** shown in red on the staff visit list with the
   reason and a **Try charging $50 again** button.
 
 ## 10. Test everything with your own phone
 
 1. On `https://kaiyns.com`, enter your address and check the quote page shows
    a driveway size.
-2. With Stripe in **test mode**, sign up as a **One Storm** customer with your
+2. With Stripe in **test mode**, sign up as a **One Time** customer with your
    own phone number, tick "Text me when snow is coming", and on Stripe's page
    use the test card `4242 4242 4242 4242` (any future date, any CVC).
    Check PocketBase: your plan should change from `pending` to `active`

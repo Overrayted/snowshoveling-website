@@ -219,7 +219,7 @@ function VisitGroup({
   );
 }
 
-// One Storm visits are charged to the customer's saved card when marked done.
+// One Time visits are charged to the customer's saved card when marked done.
 function PaymentLine({ visit }: { visit: VisitRow }) {
   const amount = formatPrice(visit.price);
   switch (visit.payment_status) {
@@ -250,7 +250,7 @@ function StartStormDayForm({ defaultDate, minDate }: { defaultDate: string; minD
       <h2 className="text-2xl font-bold">Start a storm day</h2>
       <p className="mt-1 text-lg">
         If the forecast missed a snowfall: this books every Monthly and Full Season customer and
-        texts One Storm customers an offer. Running it again for the same day won&apos;t text anyone twice.
+        texts One Time customers an offer. Running it again for the same day won&apos;t text anyone twice.
       </p>
       <label className="mt-4 block text-xl font-bold">
         Date

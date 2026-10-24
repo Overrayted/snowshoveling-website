@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { BUSINESS_PHONE, PLANS, getQuoteAmount } from "@/lib/business";
+import { CONTACT_US, PLANS, getQuoteAmount } from "@/lib/business";
 import { normalizePhone } from "@/lib/db/customers";
 import { signUpCustomer, type SignupResult } from "@/lib/db/signup";
 import { estimateDriveway } from "@/lib/estimator";
@@ -70,7 +70,7 @@ export async function submitSignup(
     return {
       values,
       errors: {},
-      formError: `Sorry, something went wrong saving your details. Please try again, or call us at ${BUSINESS_PHONE.display}.`,
+      formError: `Sorry, something went wrong saving your details. Please try again, or ${CONTACT_US}.`,
     };
   }
 

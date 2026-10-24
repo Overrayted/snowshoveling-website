@@ -52,7 +52,7 @@ export async function setVisitStatus(formData: FormData) {
     completed_at: done ? new Date().toISOString() : "",
     completed_by: done ? staff.id : "",
   });
-  // One Storm visits are charged to the saved card once the job is done
+  // One Time visits are charged to the saved card once the job is done
   if (done) await chargeVisit(visitId);
   revalidatePath("/staff");
 }
