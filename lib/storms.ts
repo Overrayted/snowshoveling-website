@@ -1,6 +1,6 @@
 import "server-only";
 import { CONTACT_US, formatPrice, getPlan } from "@/lib/business";
-import { formatServiceDate, localDate } from "@/lib/dates";
+import { addDays, formatServiceDate, localDate } from "@/lib/dates";
 import { siteUrl } from "@/lib/env";
 import { getAdminClient, isNotFound, isValidationError } from "@/lib/pocketbase/client";
 import type {
@@ -19,13 +19,19 @@ export type StormDayResult = {
   offersSent: number;
   offerFailures: number;
   staffNotified: number;
+  // False when the storm day is further off than tomorrow: texts wait for the
+  // daily check the day before (sendTomorrowsTexts)
+  textsSent: boolean;
 };
 
 // Creates (or resumes) a storm day and does everything that follows from it:
-//  1. Monthly and Full Season customers are booked automatically.
+//  1. Monthly and Full Season customers are booked (confirmed) automatically.
 //  2. One-time customers who agreed to texts are offered a visit by SMS.
 //  3. Staff are texted a summary.
-// Safe to run more than once for the same date: nobody is texted twice.
+// Steps 2 and 3 only happen the day before (or on the day itself, for a storm
+// day added at the last minute).
+// Safe to run more than once for the same date: nobody is texted twice, and
+// customers who signed up since the last run are added.
 export async function startStormDay(input: {
   serviceDate: string;
   expectedSnowMm: number | null;
@@ -72,13 +78,61 @@ export async function startStormDay(input: {
     }
   }
 
-  const offers = await sendPendingOffers(storm);
   const { totalItems: bookedVisits } = await pb.collection("visits").getList(1, 1, {
     filter: pb.filter('storm = {:storm} && status = "booked"', { storm: storm.id }),
   });
+  const textsSent = storm.service_date <= addDays(localDate(), 1);
+  if (!textsSent) {
+    return { storm, bookedVisits, offersSent: 0, offerFailures: 0, staffNotified: 0, textsSent };
+  }
+  const offers = await sendPendingOffers(storm);
   const staffNotified = await notifyStaff(storm, bookedVisits, offers.sent);
 
-  return { storm, bookedVisits, offersSent: offers.sent, offerFailures: offers.failed, staffNotified };
+  return { storm, bookedVisits, offersSent: offers.sent, offerFailures: offers.failed, staffNotified, textsSent };
+}
+
+// Run by the daily check: if tomorrow is already a storm day (added by staff
+// earlier), sends its texts now.
+export async function sendTomorrowsTexts(): Promise<StormDayResult | null> {
+  const pb = await getAdminClient();
+  const tomorrow = addDays(localDate(), 1);
+  let storm: StormRecord;
+  try {
+    storm = await pb
+      .collection("storms")
+      .getFirstListItem(pb.filter("service_date = {:date}", { date: tomorrow }));
+  } catch (error) {
+    if (isNotFound(error)) return null;
+    throw error;
+  }
+  return startStormDay({
+    serviceDate: storm.service_date,
+    expectedSnowMm: storm.expected_snow_mm,
+    source: storm.source,
+  });
+}
+
+// Texted when staff mark a visit done, for every plan. Once per visit, so
+// Undo then Mark done again doesn't text twice.
+export async function sendVisitDoneText(visitId: string): Promise<void> {
+  const pb = await getAdminClient();
+  const visit = await pb
+    .collection("visits")
+    .getOne<WithExpand<VisitRecord, { property: WithExpand<PropertyRecord, { customer: CustomerRecord }> }>>(
+      visitId,
+      { expand: "property.customer" },
+    );
+  const property = visit.expand?.property;
+  const customer = property?.expand?.customer;
+  if (visit.status !== "done" || !property || !customer?.sms_opt_in) return;
+
+  const charged =
+    visit.payment_status === "paid" ? ` We charged ${formatPrice(visit.price)} to your card on file.` : "";
+  await sendSmsOnce(
+    `done:${visit.id}`,
+    customer.phone_number,
+    `Kaiyns Snow Shovelling: we've finished shovelling your driveway at ${property.street_address}.${charged} Thank you!`,
+  );
 }
 
 async function findOrCreateStorm(input: {
@@ -221,8 +275,9 @@ export async function handleCustomerReply(fromPhone: string, text: string): Prom
 
   const visits = await pb.collection("visits").getFullList<WithExpand<VisitRecord, { storm: StormRecord }>>({
     filter: pb.filter(
-      'property.customer = {:customer} && (status = "offered" || status = "booked") && storm.service_date >= {:today}',
-      { customer: customer.id, today: localDate() },
+      // Offers only go out the day before, so YES is about today or tomorrow
+      'property.customer = {:customer} && (status = "offered" || status = "booked") && storm.service_date >= {:today} && storm.service_date <= {:tomorrow}',
+      { customer: customer.id, today: localDate(), tomorrow: addDays(localDate(), 1) },
     ),
     expand: "storm",
   });

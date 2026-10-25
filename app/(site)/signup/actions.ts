@@ -17,7 +17,7 @@ export type SignupValues = {
 
 export type SignupState = {
   values: SignupValues;
-  errors: Partial<Record<Exclude<keyof SignupValues, "smsOptIn">, string>>;
+  errors: Partial<Record<keyof SignupValues, string>>;
   formError?: string;
 };
 
@@ -42,6 +42,11 @@ export async function submitSignup(
   if (!phone) errors.phone = "Please enter a 10-digit phone number, like 647-555-1234.";
   if (!values.address) errors.address = "Please enter your address.";
   else if (values.address.length > 200) errors.address = "Please use a shorter address.";
+  // Texts are how storm days work, so agreeing is required (CASL: the box
+  // starts unticked and the customer ticks it themselves)
+  if (!values.smsOptIn) {
+    errors.smsOptIn = "Please tick the box to agree to texts. You can stop them any time by replying STOP.";
+  }
 
   if (!plan || !phone || Object.keys(errors).length > 0) {
     return { values, errors };

@@ -12,6 +12,7 @@ import type {
   WithExpand,
 } from "@/lib/pocketbase/types";
 import { retryVisitCharge, setVisitStatus, signOut, startManualStormDay } from "./actions";
+import { AutoRefresh } from "./auto-refresh";
 
 export default function StaffPage(props: PageProps<"/staff">) {
   return (
@@ -39,6 +40,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/staff">, "searchPara
 
   return (
     <>
+      <AutoRefresh seconds={20} />
       <div className="flex flex-wrap items-center justify-between gap-4">
         <p className="text-xl">
           Hi, <strong>{staff.full_name}</strong>
@@ -106,6 +108,9 @@ async function VisitList({
   const done = byStatus("done");
   const waiting = byStatus("offered");
   const skipped = byStatus("skipped");
+  // Offers are texted the day before the storm day
+  const textDay = addDays(serviceDate, -1);
+  const textsSent = localDate() >= textDay;
 
   return (
     <section aria-labelledby="day-heading" className="mt-8">
@@ -118,7 +123,8 @@ async function VisitList({
       </p>
 
       <VisitGroup
-        title="To shovel"
+        title="Confirmed: ready to shovel"
+        note="Monthly and Full Season customers are confirmed automatically."
         visits={toDo}
         actions={[
           ["done", "Mark done"],
@@ -127,10 +133,14 @@ async function VisitList({
       />
       <VisitGroup title="Done" visits={done} actions={[["booked", "Undo"]]} />
       <VisitGroup
-        title="Texted, no reply yet"
-        note="One-time customers we offered a visit to. Call them if you have time, then press Book."
+        title="Not confirmed yet: don't shovel"
+        note={
+          textsSent
+            ? "One Time customers we texted. They move up to Confirmed when they reply YES. If you call one and they say yes, press Confirm."
+            : `One Time customers. Their text goes out on ${formatServiceDate(textDay)}. If you call one and they say yes, press Confirm.`
+        }
         visits={waiting}
-        actions={[["booked", "Book"]]}
+        actions={[["booked", "Confirm"]]}
       />
       <VisitGroup title="Skipped" visits={skipped} actions={[["booked", "Undo"]]} />
     </section>
@@ -185,6 +195,12 @@ function VisitGroup({
                 {property.driveway_size && ` · ${property.driveway_size} driveway`}
                 {property.estimated_square_feet > 0 && ` (~${property.estimated_square_feet} sq ft)`}
               </p>
+              {visit.status === "booked" && (
+                <p className="mt-1 text-lg font-bold text-green-800">
+                  ✓ Confirmed
+                  {subscription && subscription.plan_type !== "one_time" && ` (${getPlan(subscription.plan_type).name} plan)`}
+                </p>
+              )}
               <PaymentLine visit={visit} />
               <div className="mt-4 flex flex-wrap gap-3">
                 <a
@@ -249,8 +265,9 @@ function StartStormDayForm({ defaultDate, minDate }: { defaultDate: string; minD
     <form action={startManualStormDay} className="mt-14 rounded-2xl bg-brand-cyan-light p-6">
       <h2 className="text-2xl font-bold">Start a storm day</h2>
       <p className="mt-1 text-lg">
-        If the forecast missed a snowfall: this books every Monthly and Full Season customer and
-        texts One Time customers an offer. Running it again for the same day won&apos;t text anyone twice.
+        If the forecast missed a snowfall: this confirms every Monthly and Full Season customer
+        and texts One Time customers an offer. Texts go out the day before (straight away if the
+        date is today or tomorrow). Running it again for the same day won&apos;t text anyone twice.
       </p>
       <label className="mt-4 block text-xl font-bold">
         Date

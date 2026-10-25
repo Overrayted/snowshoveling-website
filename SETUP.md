@@ -281,7 +281,9 @@ and `open-next.config.ts`.
    If the staff login says "Can't reach the server", see Troubleshooting.
 
 The daily storm check runs automatically at 21:00 UTC (5pm Toronto in summer,
-4pm in winter), set by `triggers` in `wrangler.jsonc`.
+4pm in winter), set by `triggers` in `wrangler.jsonc`. It's also when storm
+texts go out: customers are only texted the day before a storm day, even if
+staff add the storm day earlier.
 
 **Deploying changes later:** `npm run deploy` again. Or deploy automatically on
 every `git push`: **Workers & Pages → kaiyns → Settings → Build** → connect the
@@ -315,8 +317,13 @@ CPU limit" in **Workers → kaiyns → Logs**, switch to **Workers Paid**
    - **Webhook**, URL `https://kaiyns.com/api/twilio/sms`, **HTTP POST**
    - Save.
 
-Twilio handles STOP/START replies by itself, and the site also records STOP so
-that customer isn't offered visits again.
+**Replies to STOP:** Twilio handles these itself. It blocks the number and texts
+back its own confirmation ("You have successfully been unsubscribed… Reply
+START to resubscribe"); we can't send our own, because Twilio stops all texts
+to that number once they reply STOP. The site also records it so that customer
+isn't offered visits again. To change the wording of Twilio's confirmation,
+move the number into a **Messaging Service** (Messaging → Services) and edit
+its **Opt-Out Management** messages.
 
 ## 9. Stripe webhook (payment notifications)
 
@@ -359,10 +366,12 @@ webhooks are separate), then replace both Stripe secrets with the live
 4. You should get:
    - the offer text ("Snow is on the way… Reply YES to book")
    - the staff summary text (if your staff record has a phone number)
-5. Reply **YES**. You should get a confirmation, and your house should move to
-   **To shovel** on the staff page.
-6. Press **Mark done**. It should show **Paid $50 ✓**, and the payment should
-   appear in Stripe → Payments. To test a decline, sign up another test
+5. Reply **YES**. You should get a "You're booked" text, and within about 20
+   seconds your house should move to **Confirmed: ready to shovel** on the
+   staff page (no need to reload).
+6. Press **Mark done**. It should show **Paid $50 ✓**, the payment should
+   appear in Stripe → Payments, and you should get a "we've finished
+   shovelling your driveway" text. To test a decline, sign up another test
    customer with card `4000 0000 0000 0341` (saves fine, declines when charged).
 7. Clean up in PocketBase: delete the test record in `storms` (its visits go
    with it), then your test customer in `customers`.

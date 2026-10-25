@@ -2,12 +2,13 @@ import { timingSafeEqual } from "node:crypto";
 import { seasonEndDate } from "@/lib/dates";
 import { expireFullSeasonPlans } from "@/lib/db/subscriptions";
 import { requireEnv } from "@/lib/env";
-import { startStormDay } from "@/lib/storms";
+import { sendTomorrowsTexts, startStormDay } from "@/lib/storms";
 import { getSnowForecast, snowThresholdMm } from "@/lib/weather";
 
 // Called once a day by the Cloudflare cron trigger (see wrangler.jsonc and
 // custom-worker.ts). Ends finished Full Season plans, then starts a storm day
-// for tomorrow when enough snow is forecast. Requires `Authorization: Bearer
+// for tomorrow when enough snow is forecast. Either way, if tomorrow is a
+// storm day, this is when its texts go out. Requires `Authorization: Bearer
 // <CRON_SECRET>`, which custom-worker.ts sends.
 export async function GET(request: Request) {
   const given = Buffer.from(request.headers.get("authorization") ?? "");
@@ -22,7 +23,9 @@ export async function GET(request: Request) {
   const forecast = await getSnowForecast();
   const threshold = snowThresholdMm();
   if (forecast.expectedSnowMm < threshold) {
-    return Response.json({ stormDay: false, threshold, expiredSeasonPlans, ...forecast });
+    // A storm day staff added ahead of time
+    const planned = await sendTomorrowsTexts();
+    return Response.json({ stormDay: planned !== null, threshold, expiredSeasonPlans, ...forecast, ...planned });
   }
 
   const result = await startStormDay({

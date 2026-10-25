@@ -7,7 +7,7 @@ import { STAFF_COOKIE, STAFF_SESSION_SECONDS, requireStaff } from "@/lib/auth";
 import { addDays, localDate } from "@/lib/dates";
 import { chargeVisit } from "@/lib/payments";
 import { createClient, isValidationError } from "@/lib/pocketbase/client";
-import { startStormDay } from "@/lib/storms";
+import { sendVisitDoneText, startStormDay } from "@/lib/storms";
 
 export type LoginState = { error?: string; email: string };
 
@@ -52,8 +52,12 @@ export async function setVisitStatus(formData: FormData) {
     completed_at: done ? new Date().toISOString() : "",
     completed_by: done ? staff.id : "",
   });
-  // One Time visits are charged to the saved card once the job is done
-  if (done) await chargeVisit(visitId);
+  if (done) {
+    // One Time visits are charged to the saved card once the job is done,
+    // then every customer gets a "driveway cleared" text
+    await chargeVisit(visitId);
+    await sendVisitDoneText(visitId).catch((error) => console.error("Done text failed", error));
+  }
   revalidatePath("/staff");
 }
 

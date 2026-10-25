@@ -87,17 +87,25 @@ export function SignupForm({
           <input
             type="checkbox"
             name="smsOptIn"
+            required
             defaultChecked={values.smsOptIn}
+            aria-invalid={errors.smsOptIn ? true : undefined}
+            aria-describedby={errors.smsOptIn ? "sms-error" : undefined}
             className="mt-1 size-8 shrink-0 accent-brand-blue"
           />
           <span>
-            <span className="block text-xl font-bold">Text me when snow is coming</span>
+            <span className="block text-xl font-bold">I agree to get texts from Kaiyns</span>
             <span className="block">
-              One Time customers: we&apos;ll text you before a snowfall so you can
-              book a visit by replying YES. Reply STOP any time to stop.
+              We text you when snow is coming and about your visits. One Time
+              customers book a visit by replying YES.
+            </span>
+            <span className="mt-2 block">
+              You can opt out any time after signing up: just reply STOP to any of
+              our texts.
             </span>
           </span>
         </label>
+        <FieldError id="sms-error" message={errors.smsOptIn} />
       </fieldset>
 
       <div>
