@@ -92,6 +92,9 @@ export async function createCheckout(input: {
       mode: "payment",
       line_items: [lineItem()],
       payment_intent_data: { metadata },
+      // Discount codes are made in the Stripe dashboard (Product catalogue >
+      // Coupons); Checkout shows an "Add promotion code" link for them.
+      allow_promotion_codes: true,
     };
   }
 
